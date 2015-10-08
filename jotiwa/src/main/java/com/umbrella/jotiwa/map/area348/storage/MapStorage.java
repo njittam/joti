@@ -3,7 +3,6 @@ package com.umbrella.jotiwa.map.area348.storage;
 import android.graphics.Color;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Parcel;
 
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -19,7 +18,6 @@ import com.umbrella.jotiwa.map.area348.MapManager;
 import com.umbrella.jotiwa.map.area348.MapPartState;
 import com.umbrella.jotiwa.map.area348.handling.HandlingResult;
 import com.umbrella.jotiwa.map.area348.handling.HunterObject;
-import com.umbrella.jotiwa.map.area348.handling.OnNewDataAvailable;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -28,40 +26,24 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Created by stesi on 22-9-2015.
  * Class for storing map data.
+ * @author Dingenis Sieger Sinke
+ * @version 1.0
+ * @since 22-9-2015
  */
 public class MapStorage extends HashMap<String, StorageObject> implements Extractor {
 
     /**
-     * @param in
+     * Initializes a new instance of MapStorage.
      */
-    protected MapStorage(Parcel in) {
+    public MapStorage() {
         storageHandler = new StorageHandler(this);
-        Object[] objects = (Object[]) in.readSerializable();
     }
-
-    /**
-     * @param onNewDataAvailableListener
-     */
-    public MapStorage(OnNewDataAvailable onNewDataAvailableListener) {
-        storageHandler = new StorageHandler(this);
-        this.onNewDataAvailableListener = onNewDataAvailableListener;
-    }
-
-    /**
-     * @param onNewDataAvailableListener
-     */
-    public void setOnNewDataAvailableListener(OnNewDataAvailable onNewDataAvailableListener) {
-        this.onNewDataAvailableListener = onNewDataAvailableListener; // event listeners zijn toch vaak lists of iets dat daar p lijkt?
-    }
-
-    private OnNewDataAvailable onNewDataAvailableListener;
 
     /**
      * Gets the associated StorageObject from a id.
      *
-     * @param mapPartState
+     * @param mapPartState The state the storage object is associated with.
      * @return
      */
     public StorageObject getAssociatedStorageObject(MapPartState mapPartState) {
@@ -69,27 +51,58 @@ public class MapStorage extends HashMap<String, StorageObject> implements Extrac
         return this.get(mapPartState.getAccessor());
     }
 
+
+    /**
+     * Gets the last info of the storage object.
+     * */
+    public BaseInfo getLastInfo(StorageObject storageObject)
+    {
+        ArrayList<BaseInfo> info = storageObject.getAssociatedInfo();
+        BaseInfo greatestInfo = new BaseInfo();
+        for(int i = 0; i < info.size(); i++)
+        {
+            BaseInfo baseInfo = info.get(i);
+            if(baseInfo.id > greatestInfo.id)
+            {
+                greatestInfo = baseInfo;
+            }
+        }
+        return greatestInfo;
+    }
+
+
+    /**
+     * Gets the value indicating if the info is the last.
+     * */
+    public boolean isLastInfo(MapPartState mapPartState, BaseInfo info)
+    {
+        BaseInfo last = getLastInfo(getAssociatedStorageObject(mapPartState));
+        if(last.id == info.id) return true;
+        return false;
+    }
+
     /**
      * Gets a info from a id.
      *
-     * @param storageObject
-     * @param id
-     * @return
+     * @param storageObject The storage object that should be search through for the matching id.
+     * @param id The id that identifies the info.
+     * @return The id associated info. Returns a empty info if no match was found.
      */
     public BaseInfo getAssociatedInfoFromId(StorageObject storageObject, int id) {
+
         ArrayList<BaseInfo> info = storageObject.getAssociatedInfo();
         for (int i = 0; i < info.size(); i++) {
             if (info.get(i).id == id) return info.get(i);
         }
-        return null;
+        return new BaseInfo();
     }
 
     /**
      * Finds a spefic info with it's id.
      *
-     * @param mapPartState
-     * @param id
-     * @return
+     * @param mapPartState The state where the info should be located.
+     * @param id The id that identifies the info.
+     * @return The associated info.
      */
     public BaseInfo findInfo(MapPartState mapPartState, int id) {
         return this.getAssociatedInfoFromId(this.getAssociatedStorageObject(mapPartState), id);
@@ -103,6 +116,28 @@ public class MapStorage extends HashMap<String, StorageObject> implements Extrac
         Thread thread = new Thread(new ExtractionTask(results));
         thread.start();
     }
+
+    /**
+     * Checks if the collection exists if not, create one with the given accessor.
+     *
+     * @param accessor
+     */
+    public void check(String accessor) {
+        if (this.get(accessor) == null) this.put(accessor, new StorageObject());
+    }
+
+    /**
+     * The storage handler.
+     */
+    private static StorageHandler storageHandler;
+
+    /**
+     * @return
+     */
+    public static StorageHandler getStorageHandler() {
+        return storageHandler;
+    }
+
 
     /**
      * Class that serves as a encapsulation for the extraction task.
@@ -131,10 +166,11 @@ public class MapStorage extends HashMap<String, StorageObject> implements Extrac
 
                 if (current.getMapPart() == MapPart.Hunters) {
                     HunterInfo[][] hunterInfos = (HunterInfo[][]) current.getObjects()[1];
-                    int count = hunterInfos.length - 1;
+                    int count = hunterInfos.length;
                     for (Map.Entry<String, HunterObject> entry : ((HashMap<String, HunterObject>) current.getObjects()[0]).entrySet()) {
                         check(entry.getKey());
                         StorageObject storageObjectHunter = get(entry.getKey());
+                        storageObjectHunter.getMarkers().clear();
                         storageObjectHunter.getMarkers().add(entry.getValue().getMarker());
                         if (storageObjectHunter.getPolylines().size() > 0) {
                             PolylineOptions options = (PolylineOptions) storageObjectHunter.getPolylines().get(0);
@@ -146,7 +182,7 @@ public class MapStorage extends HashMap<String, StorageObject> implements Extrac
                             pOptions.width(5);
                             storageObjectHunter.getPolylines().add(pOptions);
                         }
-                        storageObjectHunter.getAssociatedInfo().addAll(Arrays.asList(hunterInfos[count]));
+                        storageObjectHunter.setAssociatedInfo(entry.getValue().getHunterInfo());
 
                         /**
                          * Add a state to the new state list, so for each hunter a state is created.
@@ -220,28 +256,6 @@ public class MapStorage extends HashMap<String, StorageObject> implements Extrac
             MapManager.getMapManagerHandler().sendMessage(message);
         }
 
-    }
-
-
-    /**
-     * Checks if the collection exists if not, create one with the given accessor.
-     *
-     * @param accessor
-     */
-    public void check(String accessor) {
-        if (this.get(accessor) == null) this.put(accessor, new StorageObject());
-    }
-
-    /**
-     * The storage handler.
-     */
-    private static StorageHandler storageHandler;
-
-    /**
-     * @return
-     */
-    public static StorageHandler getStorageHandler() {
-        return storageHandler;
     }
 
     /**

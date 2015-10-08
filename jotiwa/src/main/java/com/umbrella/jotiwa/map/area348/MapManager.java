@@ -18,42 +18,50 @@ import com.umbrella.jotiwa.map.area348.binding.MapBinder;
 import com.umbrella.jotiwa.map.area348.handling.OnNewDataAvailable;
 import com.umbrella.jotiwa.map.area348.storage.MapStorage;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
 /**
- * Created by stesi on 25-9-2015.
  * The final control unit for map managing.
+ * @author Dingenis Sieger Sinke
+ * @version 1.0
+ * @since 25-9-2015
  */
 public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvailable {
 
     /**
-     * @param gMap
+     * @param gMap The google map that the manager should manage on.
      */
     public MapManager(GoogleMap gMap) {
         super();
         this.gMap = gMap;
+
+        /**
+         * Create new map binder.
+         * */
         this.mapBinder = new MapBinder(gMap);
-        if (mapManagerHandler == null) {
-            mapManagerHandler = new MapManagerHandler();
-        }
+
+        /**
+         * (Re)create the handler to set the OnNewDataAvailable listener to this class.
+         * */
+        mapManagerHandler = new MapManagerHandler(this);
+
+        /**
+         * Only create a storage once, else data is lost.
+         * */
         if (mapStorage == null) {
-            mapStorage = new MapStorage(this);
-        } else {
-            mapStorage.setOnNewDataAvailableListener(this);
+            mapStorage = new MapStorage();
         }
 
+        /**
+         * Only create a data updater once, because it has no references to this class.
+         * */
         if (dataUpdater == null) {
             dataUpdater = new DataUpdater();
         }
-        this.operable = true;
     }
-
-    /**
-     * Value indicating if the manager is operable.
-     */
-    boolean operable = false;
 
     /**
      * The reference to the GoogleMap.
@@ -62,7 +70,7 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
 
 
     /**
-     *
+     * The binder that binds items to the map.
      */
     MapBinder mapBinder;
 
@@ -77,7 +85,7 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
     /**
      *
      */
-    public void CameraToCurrentLocation() {
+    public void cameraToCurrentLocation() {
         Location location = JotiApp.getLastLocation();
         CameraUpdate camera;
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(JotiApp.getContext());
@@ -94,20 +102,6 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
         gMap.moveCamera(camera);
     }
 
-    /**
-     *
-     */
-    public class MapManagerHandler extends Handler {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-
-            }
-            onNewDataAvailable((ArrayList<MapPartState>) msg.obj);
-            super.handleMessage(msg);
-        }
-    }
-
     private static MapManagerHandler mapManagerHandler;
 
     /**
@@ -117,9 +111,6 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
         return mapManagerHandler;
     }
 
-    /*
-     * TODO:Consider making MapStorage and DataUpdater static, handler should be static else memory leaking.
-     */
     private static MapStorage mapStorage;
 
     private static DataUpdater dataUpdater;
@@ -213,7 +204,7 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
 
 
     /**
-     *
+     * Updates all the states storages by requesting the data from the server.
      */
     public void update() {
         /**
@@ -251,20 +242,23 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
      */
     @Override
     public boolean remove(Object object) {
+        mapBinder.getAssociatedMapBindObject((MapPartState)object).remove();
         return super.remove(object);
     }
 
     /**
      * Syncs the specific state's storage with the Map with help of the MapBinder.
      *
-     * @param mapPartState
+     * @param mapPartState The state that should be synced.
      */
-    private void sync(MapPartState mapPartState) {
+    public void sync(MapPartState mapPartState) {
         mapBinder.add(mapPartState, mapStorage.getAssociatedStorageObject(mapPartState), MapBinder.MapBinderAddOptions.MAP_BINDER_ADD_OPTIONS_CLEAR);
     }
 
     /**
-     * @param states
+     * Syncs each state's storage with the Map with help of the MapBinder.
+     *
+     * @param states The states that should be synced.
      */
     public void sync(ArrayList<MapPartState> states) {
         for (int i = 0; i < states.size(); i++) {
@@ -275,9 +269,9 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
     }
 
     /**
-     * Syncs the storage with the Map with help of the MapBinder.
+     * Syncs each state's storage with the Map with help of the MapBinder.
      */
-    public void sync() {
+    public void syncAll() {
         for (int i = 0; i < this.size(); i++) {
             if (this.get(i).hasLocalData()) {
                 sync(this.get(i));
@@ -316,10 +310,10 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
     /**
      * Finds a state.
      *
-     * @param mapPart
-     * @param teamPart
-     * @param accessor
-     * @return
+     * @param mapPart The MapPart of the state.
+     * @param teamPart The TeamPart of the state.
+     * @param accessor The accessor of the state.
+     * @return The founded state, return null if no state is found.
      */
     public MapPartState findState(MapPart mapPart, TeamPart teamPart, String accessor) {
         for (int i = 0; i < this.size(); i++) {
@@ -334,23 +328,57 @@ public class MapManager extends ArrayList<MapPartState> implements OnNewDataAvai
     /**
      * Gets invoked when new data is available -> update the states and sync them.
      *
-     * @param newStates
+     * @param newStates The array list of new states that should be added.
      */
     @Override
     public void onNewDataAvailable(ArrayList<MapPartState> newStates) {
-        if (!this.operable) return;
 
+        /**
+         * Checks if there are new states, if so add them.
+         * */
         if (newStates != null) {
             this.addAll(newStates);
         }
 
+        /**
+         * Loop trough each state.
+         * */
         for (int i = 0; i < this.size(); i++) {
             MapPartState current = this.get(i);
+
+            /**
+             * Check if the state is pending, so thereby is expecting a update.
+             * */
             if (current.isPending()) {
-                sync(current);
                 current.setHasLocalData(true);
+                current.setHasNewData(true);
                 current.setPending(false);
+                sync(current);
             }
+        }
+    }
+
+    /**
+     * The handler that receives messages and thereby executes the associated UI code on the main thread.
+     */
+    public static class MapManagerHandler extends Handler {
+
+        public MapManagerHandler(OnNewDataAvailable onNewDataAvailable)
+        {
+            this.onNewDataAvailableWeakReference = new WeakReference<>(onNewDataAvailable);
+        }
+
+        private WeakReference<OnNewDataAvailable> onNewDataAvailableWeakReference;
+
+        @Override
+        public void handleMessage(Message msg) {
+
+            OnNewDataAvailable onNewDataAvailableRef = this.onNewDataAvailableWeakReference.get();
+            if(onNewDataAvailableRef != null)
+            {
+                onNewDataAvailableRef.onNewDataAvailable((ArrayList<MapPartState>)msg.obj);
+            }
+            super.handleMessage(msg);
         }
     }
 

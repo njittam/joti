@@ -67,22 +67,29 @@ public class MapBinder extends HashMap<String, MapBindObject> {
 
 
     /**
-     * @param mapPartState
-     * @param storageObject
-     * @param options
+     * Adds a state's data to the map.
+     * @param mapPartState The state to add to the map.
+     * @param storageObject The storage object that contains the data.
+     * @param options The options for the adding.
      */
     public void add(MapPartState mapPartState, StorageObject storageObject, MapBinderAddOptions options) {
         if (storageObject == null) {
             JotiApp.debug("ERROR storage object = null in MapBinder.add");
             storageObject = new StorageObject();
         }
-        if (mapPartState.getAccessor().equals("hunter")) return;
 
-        if (!mapPartState.getShow()) return;
+        if(!mapPartState.isAddable()) return;
+
+        if(!mapPartState.hasNewData()) return;
 
         String accessor = mapPartState.getAccessor();
         check(accessor);
         MapBindObject bindObject = this.get(accessor);
+
+        if(mapPartState.isOnMap())
+        {
+            bindObject.remove();
+        }
 
         if (options == MapBinderAddOptions.MAP_BINDER_ADD_OPTIONS_CLEAR) {
             bindObject.getMarkers().clear();
@@ -114,6 +121,15 @@ public class MapBinder extends HashMap<String, MapBindObject> {
             bindObject.getCircles().add(gMap.addCircle(circles.get(c)));
         }
 
+        /**
+         * If the state should not be shown
+         * */
+        if(!mapPartState.getShow())
+        {
+            bindObject.setVisiblty(false);
+        }
+
+        mapPartState.setIsOnMap(true);
     }
 
     /**
@@ -132,7 +148,8 @@ public class MapBinder extends HashMap<String, MapBindObject> {
     }
 
     private void check(String accessor) {
-        if (this.get(accessor) == null) this.put(accessor, new MapBindObject());
+        if (this.get(accessor) == null)
+            this.put(accessor, new MapBindObject());
     }
 
 }

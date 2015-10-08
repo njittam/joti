@@ -91,7 +91,8 @@ public class MapBindObject {
      */
     public void remove() {
         for (int m = 0; m < this.markers.size(); m++) {
-            this.markers.get(m).remove();
+            Marker marker = this.markers.get(m);
+            marker.remove();
         }
         this.markers.clear();
 

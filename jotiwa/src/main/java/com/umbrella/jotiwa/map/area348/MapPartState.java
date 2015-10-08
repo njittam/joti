@@ -11,7 +11,6 @@ import com.umbrella.jotiwa.communication.enumeration.area348.TeamPart;
 import java.io.Serializable;
 
 /**
- * Created by stesi on 25-9-2015.
  * Class for controlling the flow of updating, handling and reading.
  * This class servers as a holder for the control values.
  *
@@ -130,19 +129,16 @@ public class MapPartState implements Serializable {
     private boolean hasLocalData = false;
 
     /**
-     * Value indicating if the state has markers.
-     */
-    private boolean hasMarkers = false;
+     * Value indicating if the state has new data availiabe at the storage.
+     * */
+    private boolean hasNewData = false;
 
     /**
-     * Value indicating if the state has polylines.
-     */
-    private boolean hasPolylines = false;
+     * Value indicating if the state is addable to the map.
+     * */
+    private boolean addable = true;
 
-    /**
-     * Value indicating if the state has circles.
-     */
-    private boolean hasCircles = false;
+
     //endregion
 
     //region fields
@@ -177,11 +173,12 @@ public class MapPartState implements Serializable {
     }
 
     /**
-     * @return
+     * @return Value indicating if the state is on the map, TRUE: is on the map, FALSE: is not on the map.
      */
     public boolean isOnMap() {
         return isOnMap;
     }
+
 
     /**
      * @return
@@ -221,6 +218,21 @@ public class MapPartState implements Serializable {
     public boolean hasLocalData() {
         return hasLocalData;
     }
+
+    /**
+     * @return Value indicating if the state has new data avaibible at the storage.
+     * */
+    public boolean hasNewData() {
+        return hasNewData;
+    }
+
+    /**
+     * @return Value indicating if the state is addable to the map.
+     * */
+    public boolean isAddable() {
+        return addable;
+    }
+
     //endregion
 
     //region set
@@ -232,11 +244,24 @@ public class MapPartState implements Serializable {
         this.pending = pending;
     }
 
+
+    public void setIsOnMap(boolean isOnMap) {
+        this.isOnMap = isOnMap;
+    }
+
     /**
      * @param hasLocalData
      */
     public void setHasLocalData(boolean hasLocalData) {
         this.hasLocalData = hasLocalData;
+    }
+
+    public void setHasNewData(boolean hasNewData) {
+        this.hasNewData = hasNewData;
+    }
+
+    public void setAddable(boolean addable) {
+        this.addable = addable;
     }
 
     //endregion
